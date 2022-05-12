@@ -92,16 +92,16 @@ def main() -> None:
     bf = get_devs(df, bin=args.bin, alpha=0.15)
     devs = get_devs(df, bin=args.bin)
 
-    import matplotlib.pyplot as plt
-    devs = devs["devs"].tolist()
-    plt.bar([i for i in range(len(devs))], devs, width=4)
-
-    bf = bf["bus_factor"]
-    plt.bar([i for i in range(len(bf))], bf, width=4)
-
-    plt.show()
-
-    quit()
+    # import matplotlib.pyplot as plt
+    # devs = devs["devs"].tolist()
+    # plt.bar([i for i in range(len(devs))], devs, width=4)
+    #
+    # bf = bf["bus_factor"]
+    # plt.bar([i for i in range(len(bf))], bf, width=4)
+    #
+    # plt.show()
+    #
+    # quit()
     bf.to_json(args.output, indent=4)
 
 

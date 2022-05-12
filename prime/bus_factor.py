@@ -12,6 +12,7 @@ def main() -> None:
 
     df = pd.read_json(args.input) #.T
     bf = get_devs(df, bin=args.bin, alpha=args.alpha)
+    bf.to_json(args.output, indent=4)
 
 if __name__ == '__main__':
     main()
