@@ -8,8 +8,8 @@ def get_devs(df: DataFrame, *, bin: int, alpha=0.0) -> DataFrame:
     '''if alpha compute bus factor else num devs'''
 
     '''pseudocode
-    find average kloc per day
-    find number of devs who contribute alpha% of avg KLOC each day
+    find average DLOC per day
+    find number of devs who contribute alpha% of avg DLOC each day
 
     rationale:
         if someone commits 1 line and he is the only contributor that day,
@@ -17,21 +17,22 @@ def get_devs(df: DataFrame, *, bin: int, alpha=0.0) -> DataFrame:
 
     or
 
-    find find avg kloc per commit
+    find find avg DLOC per commit
     find number of devs who are in alpha percentile of contributors each day
     ** choice rn ... easier and more important imo
     '''
 
-    if alpha:
-        kloc = df["kloc"].tolist()
-        kloc.sort()
-
-        # significance is the highest KLOC committed in the lowest alpha% of commits
-        # any value higher than "significance" is considered a a key contribution
-        # TODO is it ok that some people may be key contributors one day but not the next
-
-        threshold = int(alpha*len(kloc))
-        significance = kloc[threshold]
+    # # global percentile DLOC
+    # if alpha:
+    #     dloc = df["delta_loc"].tolist()
+    #     dloc.sort()
+    #
+    #     # significance is the highest DLOC committed in the lowest alpha% of commits
+    #     # any value higher than "significance" is considered a a key contribution
+    #     # TODO is it ok that some people may be key contributors one day but not the next
+    #
+    #     threshold = int(alpha*len(dloc))
+    #     significance = dloc[threshold]
 
     day_key = "day_since_0"
     # keeps swiching between day_since days_since and author_days_since 0
@@ -62,8 +63,19 @@ def get_devs(df: DataFrame, *, bin: int, alpha=0.0) -> DataFrame:
 
         if alpha:
             temp = df[df["commitBin"] == bin]
-            temp = temp[temp["kloc"] > significance]
-            item["bus_factor"] = len(temp["author_email"].unique())
+            abs_list = lambda l : [abs(item) for item in l]
+            significance = alpha * sum(abs_list(temp["delta_loc"].tolist()))
+
+            bf = 0
+            authors = set(temp["author_email"].tolist())
+            for author in authors:
+                author_dloc = sum(abs_list(temp[temp["author_email"] == author]["delta_loc"].tolist()))
+                if author_dloc > significance:
+                    bf += 1
+
+            temp = temp[temp["delta_loc"] > significance]
+
+            item["bus_factor"] = bf
         else:
             item["devs"] = len( df[df["commitBin"] == bin]["author_email"].unique() )
 
@@ -77,9 +89,19 @@ def main() -> None:
     args: Namespace = main_args()
 
     df = pd.read_json(args.input) #.T
-    bf = get_devs(df, bin=args.bin, alpha=0.8)
-    devs = get_devs(df, bin=args.bin, alpha=0.0)
+    bf = get_devs(df, bin=args.bin, alpha=0.15)
+    devs = get_devs(df, bin=args.bin)
 
+    import matplotlib.pyplot as plt
+    devs = devs["devs"].tolist()
+    plt.bar([i for i in range(len(devs))], devs, width=4)
+
+    bf = bf["bus_factor"]
+    plt.bar([i for i in range(len(bf))], bf, width=4)
+
+    plt.show()
+
+    quit()
     bf.to_json(args.output, indent=4)
 
 
