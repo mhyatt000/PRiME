@@ -1,46 +1,37 @@
-from argparse import ArgumentParser, Namespace
-from typing import Dict
+from argparse import Namespace
 
 import pandas
-from pandas import DataFrame, Series
+from pandas import Categorical, DataFrame, Interval, Series
+
+from clime_bus_factor.args import mainArgs
+from clime_bus_factor.version import version
 
 
-def get_argparse() -> Namespace:
-    parser: ArgumentParser = ArgumentParser(
-        prog="SSL Metrics Bus Factor Computer",
-        usage="Computes the bus factor per day",
-        description="Computes the bus factor per day using the output of ssl-metrics-git-commit-loc-extract",
-    )
-    parser.add_argument(
-        "-i",
-        "--input",
-        help="JSON file outputted from ssl-metrics-git-commits-loc-extract to be used to calculate bus factor",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="JSON file that will contain the bus factor metric information",
-        type=str,
-        required=True,
-    )
-    return parser.parse_args()
-
-
-def buildBusFactor(df: DataFrame) -> DataFrame:
-    daysSince0: Series = df["day_since_0"].unique()
+def buildBusFactor(df: DataFrame, bin: int) -> DataFrame:
+    daysSince0: Series = df["author_days_since_0"].unique()
 
     data: list = []
 
-    day: int
-    for day in range(daysSince0.max() + 1):
-        temp: Dict = {}
+    maxDays: int = daysSince0.max() + bin
+    bins: list = [day for day in range(maxDays) if day % bin == 0]
 
-        busFactor: int = len(df[df["day_since_0"] == day]["author_email"].unique())
+    df["commitBin"] = pandas.cut(
+        df["author_days_since_0"], bins=bins, include_lowest=True
+    )
+
+    bins: Categorical = df["commitBin"].unique()
+    binList: list = bins.tolist()
+
+    bin: Interval
+    for bin in binList:
+        temp: dict = {}
+
+        day: int = int(bin.left) if bin.left > 0 else 0
+
+        busFactor: int = len(df[df["commitBin"] == bin]["author_email"].unique())
 
         temp["days_since_0"] = day
-        temp["bus_factor"] = busFactor
+        temp["busFactor"] = busFactor
 
         data.append(temp)
 
@@ -48,16 +39,18 @@ def buildBusFactor(df: DataFrame) -> DataFrame:
 
 
 def main() -> None:
-    args: Namespace = get_argparse()
+    args: Namespace = mainArgs()
 
-    if args.input[-5::] != ".json":
-        print("Invalid input file type. Input file must be JSON")
+    if args.version:
+        print(f"clime-git-bus-factor-compute version {version()}")
+        quit(0)
+
+    if args.bin < 1:
+        print(f"Bin arguement must be an integer greater than 0: {args.bin}")
         quit(1)
 
-    dfIn: DataFrame = pandas.read_json(args.input)
-    dfOut: DataFrame = buildBusFactor(df=dfIn)
-
-    dfOut.to_json(args.output)
+    df: DataFrame = pandas.read_json(args.input).T
+    buildBusFactor(df, bin=args.bin).to_json(args.output, indent=4)
 
 
 if __name__ == "__main__":
